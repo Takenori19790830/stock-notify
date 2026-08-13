@@ -2,9 +2,9 @@ name: stock-notify
 
 on:
   schedule:
-    - cron: "0 8 * * *"
-    - cron: "30 12 * * *"
-    - cron: "0 15 * * *"
+    - cron: "0 8 * * *"      # 08:00 寄り付き
+    - cron: "30 12 * * *"    # 12:30 後場寄り付き
+    - cron: "0 15 * * *"     # 15:00 引け
   workflow_dispatch:
 
 jobs:
