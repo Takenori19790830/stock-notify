@@ -1,10 +1,9 @@
-name: test-notify-1410
+name: test-notify-1410v2
 
 on:
   schedule:
-    - cron: "*/10 * * * *"   # JST 14:41（UTC 05:41）
-  workflow_dispatch:        # 手動実行もできる
-
+    - cron: "*/10 * * * *"
+  
 jobs:
   run:
     runs-on: ubuntu-latest
