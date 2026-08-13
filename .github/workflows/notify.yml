@@ -2,7 +2,8 @@ name: stock-notify
 
 on:
   schedule:
-    - cron: "0 8 * * *"
+    - cron: "0 8 * * *"     # 08:00
+    - cron: "30 12 * * *"   # 12:30
   workflow_dispatch:
 
 jobs:
@@ -22,4 +23,10 @@ jobs:
       - name: Run notify
         env:
           WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
-        run: python notify.py
+          MODE: ${{ github.event.schedule }}
+        run: |
+          if [ "${MODE}" = "0 8 * * *" ]; then
+            MODE=morning python notify.py
+          else
+            MODE=noon python notify.py
+          fi
