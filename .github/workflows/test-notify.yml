@@ -2,7 +2,7 @@ name: test-notify-1410
 
 on:
   schedule:
-    - cron: "55 5 * * *"   # JST 14:41（UTC 05:41）
+    - cron: "*/10 * * * *"   # JST 14:41（UTC 05:41）
   workflow_dispatch:        # 手動実行もできる
 
 jobs:
