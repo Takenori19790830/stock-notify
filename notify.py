@@ -26,7 +26,6 @@ def check_opening():
     topix_fut  = get_price("^TPX")     # TOPIX先物（安定版）
     usd_jpy    = get_price("JPY=X")
 
-    # どれか取れなかったら見送り
     if nikkei_fut is None or topix_fut is None or usd_jpy is None:
         send("【08:00 寄り付き判定】データ取得失敗のため見送り")
         return
@@ -112,4 +111,10 @@ def check_noon():
     value  = get_price("1306.T")
     style_score = 1 if growth and value and growth > value else -1
 
-    large = get
+    large = get_price("1343.T")
+    small = get_price("1312.T")
+    size_score = 1 if large and small and large > small else -1
+
+    total = (
+        base +
+        sector_score * 
