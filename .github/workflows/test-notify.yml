@@ -1,9 +1,8 @@
-name: test-notify-1410v2
+name: test-notify-1410v2a
 
 on:
   schedule:
-    - cron: "*/10 * * * *"
-  
+    - cron: "*/5 * * * *"  
 jobs:
   run:
     runs-on: ubuntu-latest
