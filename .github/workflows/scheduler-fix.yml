@@ -1,0 +1,11 @@
+name: scheduler-fix
+
+on:
+  schedule:
+    - cron: "* * * * *"
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "schedule fix test"
