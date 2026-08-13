@@ -2,13 +2,15 @@ name: stock-notify
 
 on:
   schedule:
-    - cron: "0 8 * * *"     # 08:00
-    - cron: "30 12 * * *"   # 12:30
-  workflow_dispatch:
+    - cron: "0 8 * * *"      # 08:00 寄り付き
+    - cron: "30 12 * * *"    # 12:30 後場寄り付き
+    - cron: "0 15 * * *"     # 15:00 引け
+  workflow_dispatch:          # 手動実行も可能
 
 jobs:
   run:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v3
 
@@ -20,13 +22,19 @@ jobs:
       - name: Install dependencies
         run: pip install requests
 
-      - name: Run notify
+      - name: Run notify (MODE 切り替え)
         env:
           WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
-          MODE: ${{ github.event.schedule }}
+          CRON_SCHEDULE: ${{ github.event.schedule }}
         run: |
-          if [ "${MODE}" = "0 8 * * *" ]; then
-            MODE=morning python notify.py
-          else
+          echo "CRON_SCHEDULE=${CRON_SCHEDULE}"
+
+          if [ "${CRON_SCHEDULE}" = "0 8 * * *" ]; then
+            echo "MODE=opening"
+            MODE=opening python notify.py
+
+          elif [ "${CRON_SCHEDULE}" = "30 12 * * *" ]; then
+            echo "MODE=noon"
             MODE=noon python notify.py
-          fi
+
+          elif [ "${CRON_SCHEDULE}" = "0 15 * * *
