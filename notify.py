@@ -21,22 +21,36 @@ TICKERS = {
 def fetch_data():
     data = {}
     for name, t in TICKERS.items():
-        df = yf.Ticker(t).history(period="60d")
-        close = df["Close"].iloc[-1]
+        df = yf.Ticker(t).history(period="5d")
 
+        # 終値
+        close = df["Close"].iloc[-1]
+        prev_close = df["Close"].iloc[-2]
+
+        # 前日比（％）
+        pct_change = (close - prev_close) / prev_close * 100
+
+        # 移動平均
         ma5 = df["Close"].rolling(5).mean().iloc[-1]
         ma15 = df["Close"].rolling(15).mean().iloc[-1]
         ma25 = df["Close"].rolling(25).mean().iloc[-1]
 
+        # 最終更新日時（日本時間）
+        last_ts = df.index[-1].tz_convert("Asia/Tokyo")
+
         data[name] = {
             "close": close,
+            "prev_close": prev_close,
+            "pct_change": pct_change,
             "ma5": ma5,
             "ma15": ma15,
             "ma25": ma25,
             "kairi5": (close - ma5) / ma5 * 100,
-            "kairi15": (close - ma15) / ma15 * 100
+            "kairi15": (close - ma15) / ma15 * 100,
+            "timestamp": last_ts
         }
     return data
+
 
 # ============================
 # 短期スコアリング（勢い）
@@ -49,7 +63,6 @@ def score_short(d):
 
     nikkei = d["nikkei"]
 
-    # MA5 の向き（最重要）
     if nikkei["close"] > nikkei["ma5"]:
         bull += 3
         reason.append("MA5上向き")
@@ -57,7 +70,6 @@ def score_short(d):
         bear += 3
         reason.append("MA5下向き")
 
-    # 現在値 vs MA5
     if nikkei["close"] > nikkei["ma5"]:
         bull += 2
         reason.append("現在値がMA5より上")
@@ -65,7 +77,6 @@ def score_short(d):
         bear += 2
         reason.append("現在値がMA5より下")
 
-    # 乖離率
     if nikkei["kairi5"] > 2:
         bear += 1
         reason.append("短期過熱（ベア寄り）")
@@ -73,7 +84,6 @@ def score_short(d):
         bull += 1
         reason.append("短期売られすぎ（ブル寄り）")
 
-    # 為替
     if d["usd_jpy"]["close"] > 150:
         bull += 1
         reason.append("円安 → ブル")
@@ -81,7 +91,6 @@ def score_short(d):
         bear += 1
         reason.append("円高 → ベア")
 
-    # SPY
     if d["spy"]["close"] > d["spy"]["ma5"]:
         bull += 1
         reason.append("SPY上昇 → ブル")
@@ -89,7 +98,6 @@ def score_short(d):
         bear += 1
         reason.append("SPY下落 → ベア")
 
-    # VIX
     if d["vix"]["close"] > 20:
         bear += 1
         reason.append("VIX高い → ベア")
@@ -98,7 +106,8 @@ def score_short(d):
         reason.append("VIX低い → ブル")
 
     direction = "ブル" if bull > bear else "ベア"
-    return direction, reason
+    return direction, reason, bull, bear
+
 
 # ============================
 # スイングスコアリング（流れ）
@@ -111,7 +120,6 @@ def score_swing(d):
 
     nikkei = d["nikkei"]
 
-    # MA15 vs MA25（最重要）
     if nikkei["ma15"] > nikkei["ma25"]:
         bull += 4
         reason.append("MA15 > MA25（上昇トレンド）")
@@ -119,7 +127,6 @@ def score_swing(d):
         bear += 4
         reason.append("MA15 < MA25（下降トレンド）")
 
-    # 現在値 vs MA15
     if nikkei["close"] > nikkei["ma15"]:
         bull += 2
         reason.append("現在値がMA15より上（押し目）")
@@ -127,22 +134,14 @@ def score_swing(d):
         bear += 2
         reason.append("現在値がMA15より下（戻り）")
 
-    # セクター別
-    if d["bank"]["close"] > d["bank"]["ma5"]:
-        bull += 2
-        reason.append("金融強い → ブル")
-    else:
-        bear += 2
-        reason.append("金融弱い → ベア")
+    for sector in ["bank", "telecom", "electric"]:
+        if d[sector]["close"] > d[sector]["ma5"]:
+            bull += 2
+            reason.append(f"{sector}強い → ブル")
+        else:
+            bear += 2
+            reason.append(f"{sector}弱い → ベア")
 
-    if d["telecom"]["close"] > d["telecom"]["ma5"]:
-        bull += 2
-        reason.append("通信強い → ブル")
-    else:
-        bear += 2
-        reason.append("通信弱い → ベア")
-
-    # EWJ（海外勢）
     if d["ewj"]["close"] > d["ewj"]["ma5"]:
         bull += 1
         reason.append("海外勢買い → ブル")
@@ -150,7 +149,6 @@ def score_swing(d):
         bear += 1
         reason.append("海外勢売り → ベア")
 
-    # 地合い（為替・SPY・VIX）
     if d["usd_jpy"]["close"] > 150:
         bull += 1
     else:
@@ -167,57 +165,72 @@ def score_swing(d):
         bull += 1
 
     direction = "ブル" if bull > bear else "ベア"
-    return direction, reason
+    return direction, reason, bull, bear
+
+
 
 # ============================
 # 通知フォーマット（コンパクト版）
 # ============================
 
-def build_message(d, short_dir, short_reason, swing_dir, swing_reason):
+def build_embed(d, short_dir, short_reason, short_bull, short_bear,
+                swing_dir, swing_reason, swing_bull, swing_bear):
+
     nikkei = d["nikkei"]
+    ts = nikkei["timestamp"].strftime("%Y-%m-%d %H:%M")
 
-    msg = f"""
-【12:00 市場判定】
+    # 色分け
+    color = 3447003 if swing_dir == "ブル" else 15158332
 
-■短期（1〜2日）
-方向性：{short_dir}
-理由：{", ".join(short_reason[:4])}
+    embed = {
+        "embeds": [
+            {
+                "title": "市場AI通知",
+                "description": f"{ts}（日本時間）",
+                "color": color,
+                "fields": [
+                    {
+                        "name": "短期（1〜2日）",
+                        "value": f"方向性：{short_dir}（ブル点 {short_bull} / ベア点 {short_bear}）\n理由：{', '.join(short_reason[:4])}"
+                    },
+                    {
+                        "name": "スイング（3〜5日）",
+                        "value": f"方向性：{swing_dir}（ブル点 {swing_bull} / ベア点 {swing_bear}）\n理由：{', '.join(swing_reason[:4])}"
+                    },
+                    {
+                        "name": "主要指標",
+                        "value": (
+                            f"日経：{nikkei['close']:.2f}（{color_pct(nikkei['pct_change'])}）\n"
+                            f"為替：{d['usd_jpy']['close']:.2f}（{color_pct(d['usd_jpy']['pct_change'])}）\n"
+                            f"SPY：{d['spy']['close']:.2f}（{color_pct(d['spy']['pct_change'])}）\n"
+                            f"VIX：{d['vix']['close']:.2f}（{color_pct(d['vix']['pct_change'])}）\n"
+                            f"EWJ：{d['ewj']['close']:.2f}（{color_pct(d['ewj']['pct_change'])}）"
+                        )
+                    },
+                    {
+                        "name": "セクター",
+                        "value": (
+                            f"金融：{d['bank']['close']:.2f}（{color_pct(d['bank']['pct_change'])}）\n"
+                            f"通信：{d['telecom']['close']:.2f}（{color_pct(d['telecom']['pct_change'])}）\n"
+                            f"電気：{d['electric']['close']:.2f}（{color_pct(d['electric']['pct_change'])}）"
+                        )
+                    }
+                ]
+            }
+        ]
+    }
 
-■スイング（3〜5日）
-方向性：{swing_dir}
-理由：{", ".join(swing_reason[:4])}
+    return embed
 
-━━━━━━━━━━━━━━
-■主要指標（要点）
-日経：{nikkei["close"]:.2f}
-MA5：{nikkei["ma5"]:.2f}（{nikkei["kairi5"]:+.2f}%）
-MA15：{nikkei["ma15"]:.2f}（{nikkei["kairi15"]:+.2f}%）
-MA25：{nikkei["ma25"]:.2f}
-
-為替：{d["usd_jpy"]["close"]:.2f}
-SPY：{d["spy"]["close"]:.2f}
-VIX：{d["vix"]["close"]:.2f}
-
-セクター：
-金融：{d["bank"]["close"]:.2f}
-通信：{d["telecom"]["close"]:.2f}
-電気：{d["electric"]["close"]:.2f}
-EWJ：{d["ewj"]["close"]:.2f}
-━━━━━━━━━━━━━━
-
-■総合判定
-短期：{short_dir}
-スイング：{swing_dir}
-"""
-
-    return msg
 
 # ============================
 # 通知送信
 # ============================
+def send(payload):
+    requests.post(WEBHOOK_URL, json=payload)
 
-def send(msg):
-    requests.post(WEBHOOK_URL, json={"content": msg})
+#def send(msg):
+#    requests.post(WEBHOOK_URL, json={"content": msg})  装飾前
 
 # ============================
 # 実行
@@ -226,8 +239,13 @@ def send(msg):
 if __name__ == "__main__":
     d = fetch_data()
 
-    short_dir, short_reason = score_short(d)
-    swing_dir, swing_reason = score_swing(d)
+    short_dir, short_reason, short_bull, short_bear = score_short(d)
+    swing_dir, swing_reason, swing_bull, swing_bear = score_swing(d)
 
-    msg = build_message(d, short_dir, short_reason, swing_dir, swing_reason)
-    send(msg)
+    payload = build_embed(
+        d,
+        short_dir, short_reason, short_bull, short_bear,
+        swing_dir, swing_reason, swing_bull, swing_bear
+    )
+
+    send(payload)
