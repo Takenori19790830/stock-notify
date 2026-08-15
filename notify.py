@@ -110,11 +110,11 @@ def score_short(d):
 
     # TOPIX
     if d["topix"]["pct_change"] > 0:
-    bull += 1
-    reason.append("TOPIX前日比プラス → 全体強い")
+        bull += 1
+        reason.append("TOPIX前日比プラス → 全体強い")
     else:
-    bear += 1
-    reason.append("TOPIX前日比マイナス → 全体弱い")
+        bear += 1
+        reason.append("TOPIX前日比マイナス → 全体弱い")
 
     # SPY
     if d["spy"]["close"] > d["spy"]["ma5"]:
