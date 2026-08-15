@@ -1,7 +1,7 @@
 import yfinance as yf
 import requests
-
-WEBHOOK_URL = "YOUR_WEBHOOK_URL"  # ← あなたのURLを入れてね
+import os
+WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 
 # ============================
 # データ取得
