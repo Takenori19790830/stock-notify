@@ -23,7 +23,7 @@ TICKERS = {
 def fetch_data():
     data = {}
     for name, t in TICKERS.items():
-        df = yf.Ticker(t).history(period="5d")
+        df = yf.Ticker(t).history(period="60d")
 
         # 終値と前日終値
         close = df["Close"].iloc[-1]
