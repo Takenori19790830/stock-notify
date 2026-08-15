@@ -51,6 +51,19 @@ def fetch_data():
         }
     return data
 
+# ============================
+# 色分け（＋青、−赤）
+# ============================
+
+def color_pct(pct):
+    if pct > 0:
+        return f"🔵 +{pct:.2f}%"
+    elif pct < 0:
+        return f"🔴 {pct:.2f}%"
+    else:
+        return f"{pct:.2f}%"
+
+
 
 # ============================
 # 短期スコアリング（勢い）
