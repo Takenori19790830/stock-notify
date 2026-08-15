@@ -10,6 +10,7 @@ WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 
 TICKERS = {
     "nikkei": "1321.T",
+    "topix": "1306.T",
     "usd_jpy": "JPY=X",
     "spy": "SPY",
     "vix": "^VIX",
@@ -107,6 +108,14 @@ def score_short(d):
         bear += 1
         reason.append("円高 → ベア")
 
+    # TOPIX
+    if d["topix"]["pct_change"] > 0:
+    bull += 1
+    reason.append("TOPIX前日比プラス → 全体強い")
+    else:
+    bear += 1
+    reason.append("TOPIX前日比マイナス → 全体弱い")
+
     # SPY
     if d["spy"]["close"] > d["spy"]["ma5"]:
         bull += 1
@@ -161,6 +170,14 @@ def score_swing(d):
         bear += 2
         reason.append("現在値がMA15より下（戻り）")
 
+     # TOPIX
+    if d["topix"]["ma15"] > d["topix"]["ma25"]:
+        bull += 1
+        reason.append("TOPIX上昇トレンド（全体補強）")
+    else:
+        bear += 1
+        reason.append("TOPIX下降トレンド（全体弱化）")
+    
     # セクター別
     for sector_key, sector_label in [("bank", "金融"), ("telecom", "通信"), ("electric", "電気")]:
         if d[sector_key]["close"] > d[sector_key]["ma5"]:
@@ -169,7 +186,7 @@ def score_swing(d):
         else:
             bear += 2
             reason.append(f"{sector_label}弱い → ベア")
-
+    
     # EWJ（海外勢）
     if d["ewj"]["close"] > d["ewj"]["ma5"]:
         bull += 1
