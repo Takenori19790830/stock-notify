@@ -260,6 +260,7 @@ def build_embed(d, short_dir, short_reason, short_bull, short_bear,
                         "name": "主要指標（前日比付き）",
                         "value": (
                             f"日経：{nikkei['close']:.2f}（{color_pct(nikkei['pct_change'])}）\n"
+                            f"TOPIX：{d['topix']['close']:.2f}（{color_pct(d['topix']['pct_change'])}）\n"
                             f"為替：{d['usd_jpy']['close']:.2f}（{color_pct(d['usd_jpy']['pct_change'])}）\n"
                             f"SPY：{d['spy']['close']:.2f}（{color_pct(d['spy']['pct_change'])}）\n"
                             f"VIX：{d['vix']['close']:.2f}（{color_pct(d['vix']['pct_change'])}）\n"
