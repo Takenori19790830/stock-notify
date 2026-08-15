@@ -1,0 +1,24 @@
+name: notify-test-manual
+
+on:
+  workflow_dispatch:   # ← 手動実行用トリガー
+
+jobs:
+  run-notify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          pip install yfinance requests pandas
+
+      - name: Run notify.py manually
+        run: python notify.py
