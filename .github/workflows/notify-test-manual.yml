@@ -1,7 +1,7 @@
 name: notify-test-manual
 
 on:
-  workflow_dispatch:   # ← 手動実行用トリガー
+  workflow_dispatch:   # ← 手動実行だけ（春だけの yml）
 
 jobs:
   run-notify:
@@ -22,3 +22,5 @@ jobs:
 
       - name: Run notify.py manually
         run: python notify.py
+        env:
+          WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
