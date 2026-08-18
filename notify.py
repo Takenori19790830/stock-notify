@@ -19,6 +19,9 @@ TICKERS = {
     "bank": "1615.T",
     "telecom": "1620.T",
     "electric": "1625.T",
+    "auto": "1622.T",
+    "trading": "1629.T",
+    "machine": "1624.T",
     "ewj": "EWJ"
 }
 
@@ -27,20 +30,14 @@ def fetch_data():
     for name, t in TICKERS.items():
         df = yf.Ticker(t).history(period="60d")
 
-        # 終値と前日終値
         close = df["Close"].iloc[-1]
         prev_close = df["Close"].iloc[-2]
-
-        # 前日比（％）
         pct_change = (close - prev_close) / prev_close * 100
 
-        # 移動平均
         ma5 = df["Close"].rolling(5).mean().iloc[-1]
         ma15 = df["Close"].rolling(15).mean().iloc[-1]
         ma25 = df["Close"].rolling(25).mean().iloc[-1]
 
-
-        # 実行時刻（日本時間）
         jst = pytz.timezone("Asia/Tokyo")
         ts = datetime.now(jst).strftime("%Y-%m-%d %H:%M")
 
@@ -80,7 +77,7 @@ def score_short(d):
 
     nikkei = d["nikkei"]
 
-    # MA5 の向き（最重要）
+    # MA5 の向き
     if nikkei["close"] > nikkei["ma5"]:
         bull += 3
         reason.append("MA5上向き")
@@ -96,7 +93,7 @@ def score_short(d):
         bear += 2
         reason.append("現在値がMA5より下")
 
-    # 乖離率
+    # 乖離
     if nikkei["kairi5"] > 2:
         bear += 1
         reason.append("短期過熱（ベア寄り）")
@@ -136,11 +133,11 @@ def score_short(d):
         bull += 1
         reason.append("VIX低い → ブル")
 
-    # ★ 前日比（勢い）をスコアに反映
+    # 日経前日比
     if nikkei["pct_change"] > 0:
         bull += 2
         reason.append("日経前日比プラス → 勢いブル")
-    elif nikkei["pct_change"] < 0:
+    else:
         bear += 2
         reason.append("日経前日比マイナス → 勢いベア")
 
@@ -158,7 +155,7 @@ def score_swing(d):
 
     nikkei = d["nikkei"]
 
-    # MA15 vs MA25（最重要）
+    # MA15 vs MA25
     if nikkei["ma15"] > nikkei["ma25"]:
         bull += 4
         reason.append("MA15 > MA25（上昇トレンド）")
@@ -174,24 +171,43 @@ def score_swing(d):
         bear += 2
         reason.append("現在値がMA15より下（戻り）")
 
-     # TOPIX
+    # TOPIX
     if d["topix"]["ma15"] > d["topix"]["ma25"]:
         bull += 1
-        reason.append("TOPIX上昇トレンド（全体補強）")
+        reason.append("TOPIX上昇トレンド")
     else:
         bear += 1
-        reason.append("TOPIX下降トレンド（全体弱化）")
-    
-    # セクター別
-    for sector_key, sector_label in [("bank", "金融"), ("telecom", "通信"), ("electric", "電気")]:
-        if d[sector_key]["close"] > d[sector_key]["ma5"]:
-            bull += 2
-            reason.append(f"{sector_label}強い → ブル")
+        reason.append("TOPIX下降トレンド")
+
+    # 6セクター
+    for key, label, weight in [
+        ("electric", "電気（半導体）", 2),
+        ("bank", "金融", 1),
+        ("telecom", "通信", 1),
+        ("auto", "自動車", 1),
+        ("trading", "商社", 1),
+        ("machine", "機械", 1)
+    ]:
+        if d[key]["close"] > d[key]["ma5"]:
+            bull += weight
+            reason.append(f"{label}強い → ブル")
         else:
-            bear += 2
-            reason.append(f"{sector_label}弱い → ベア")
-    
-    # EWJ（海外勢）
+            bear += weight
+            reason.append(f"{label}弱い → ベア")
+
+    # セクター分裂
+    strong = sum(d[k]["close"] > d[k]["ma5"] for k in ["electric","bank","telecom","auto","trading","machine"])
+    weak = 6 - strong
+    if strong >= 3 and weak >= 3:
+        bear += 2
+        reason.append("セクター分裂 → ベア")
+
+    # 自動車 × 為替ズレ
+    if d["usd_jpy"]["close"] > 150 and d["auto"]["close"] < d["auto"]["ma5"]:
+        bear += 2
+        reason.append("円安なのに自動車弱い → ベア")
+
+    # EWJ
     if d["ewj"]["close"] > d["ewj"]["ma5"]:
         bull += 1
         reason.append("海外勢買い → ブル")
@@ -215,11 +231,11 @@ def score_swing(d):
     else:
         bull += 1
 
-    # ★ 前日比（流れ補強）をスコアに反映
+    # 日経前日比
     if nikkei["pct_change"] > 0:
         bull += 1
         reason.append("日経前日比プラス（流れ補強）")
-    elif nikkei["pct_change"] < 0:
+    else:
         bear += 1
         reason.append("日経前日比マイナス（流れ弱化）")
 
@@ -227,7 +243,7 @@ def score_swing(d):
     return direction, reason, bull, bear
 
 # ============================
-# Embed 生成（Discord用）
+# Embed 生成
 # ============================
 
 def build_embed(d, short_dir, short_reason, short_bull, short_bear,
@@ -236,8 +252,7 @@ def build_embed(d, short_dir, short_reason, short_bull, short_bear,
     nikkei = d["nikkei"]
     ts = nikkei["timestamp"]
 
-    # カードの色：スイング方向で決める
-    color = 3447003 if swing_dir == "ブル" else 15158332  # 青 / 赤
+    color = 3447003 if swing_dir == "ブル" else 15158332
 
     embed = {
         "embeds": [
@@ -246,7 +261,7 @@ def build_embed(d, short_dir, short_reason, short_bull, short_bear,
                 "description": f"{ts}（日本時間）",
                 "color": color,
                 "fields": [
-                     {
+                    {
                         "name": "総合判定",
                         "value": (
                             f"短期：{short_dir}（ブル点 {short_bull} / ベア点 {short_bear}）\n"
@@ -255,15 +270,11 @@ def build_embed(d, short_dir, short_reason, short_bull, short_bear,
                     },
                     {
                         "name": "短期（1〜2日）",
-                        "value": (
-                           f"理由：{', '.join(short_reason[:4])}"
-                        )
+                        "value": f"理由：{', '.join(short_reason[:4])}"
                     },
                     {
                         "name": "スイング（3〜5日）",
-                        "value": (
-                           f"理由：{', '.join(swing_reason[:4])}"
-                        )
+                        "value": f"理由：{', '.join(swing_reason[:4])}"
                     },
                     {
                         "name": "主要指標（前日比付き）",
@@ -273,21 +284,22 @@ def build_embed(d, short_dir, short_reason, short_bull, short_bear,
                             f"為替：{d['usd_jpy']['close']:.2f}（{color_pct(d['usd_jpy']['pct_change'])}）\n"
                             f"SPY：{d['spy']['close']:.2f}（{color_pct(d['spy']['pct_change'])}）\n"
                             f"VIX：{d['vix']['close']:.2f}（{color_pct(d['vix']['pct_change'])}）\n"
-                            f"EWJ：{d['ewj']['close']:.2f}（{color_pct(d['ewj']['pct_change'])}）"
+                            f"EWJ：{d['ewj']['close']:.2f}（{color_pct(d['ewj']['pct_change'])}）\n"
+                            f"乖離（MA5）：{nikkei['kairi5']:.2f}%\n"
+                            f"乖離（MA15）：{nikkei['kairi15']:.2f}%"
                         )
                     },
-                  {
-    "name": "セクター（前日比付き）",
-    "value": (
-        f"金融：{d['bank']['close']:.2f}（{color_pct(d['bank']['pct_change'])}）\n"
-        f"通信：{d['telecom']['close']:.2f}（{color_pct(d['telecom']['pct_change'])}）\n"
-        f"電気：{d['electric']['close']:.2f}（{color_pct(d['electric']['pct_change'])}）\n"
-        f"自動車：{d['auto']['close']:.2f}（{color_pct(d['auto']['pct_change'])}）\n"
-        f"商社：{d['trading']['close']:.2f}（{color_pct(d['trading']['pct_change'])}）\n"
-        f"機械：{d['machine']['close']:.2f}（{color_pct(d['machine']['pct_change'])}）"
-    )
-},
-
+                    {
+                        "name": "セクター（前日比付き）",
+                        "value": (
+                            f"電気：{d['electric']['close']:.2f}（{color_pct(d['electric']['pct_change'])}）\n"
+                            f"金融：{d['bank']['close']:.2f}（{color_pct(d['bank']['pct_change'])}）\n"
+                            f"通信：{d['telecom']['close']:.2f}（{color_pct(d['telecom']['pct_change'])}）\n"
+                            f"自動車：{d['auto']['close']:.2f}（{color_pct(d['auto']['pct_change'])}）\n"
+                            f"商社：{d['trading']['close']:.2f}（{color_pct(d['trading']['pct_change'])}）\n"
+                            f"機械：{d['machine']['close']:.2f}（{color_pct(d['machine']['pct_change'])}）"
+                        )
+                    }
                 ]
             }
         ]
