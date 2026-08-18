@@ -1,0 +1,35 @@
+name: backtest-csv-generate
+
+on:
+  workflow_dispatch:   # 手動実行
+  schedule:
+    - cron: "0 14 * * *"   # JST23:00（必要なら変更）
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          pip install yfinance pandas
+
+      - name: Run backtest CSV generator
+        run: |
+          python backtest/backtest.py
+
+      - name: Commit CSV
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add backtest/data/3years.csv
+          git commit -m "Update 3years.csv"
+          git push
