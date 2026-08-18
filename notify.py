@@ -53,7 +53,7 @@ def fetch_data():
             "ma25": ma25,
             "kairi5": (close - ma5) / ma5 * 100,
             "kairi15": (close - ma15) / ma15 * 100,
-            "timestamp": last_ts
+            "timestamp": ts
         }
     return data
 
@@ -234,7 +234,7 @@ def build_embed(d, short_dir, short_reason, short_bull, short_bear,
                 swing_dir, swing_reason, swing_bull, swing_bear):
 
     nikkei = d["nikkei"]
-    ts = nikkei["timestamp"].strftime("%Y-%m-%d %H:%M")
+    ts = nikkei["timestamp"]
 
     # カードの色：スイング方向で決める
     color = 3447003 if swing_dir == "ブル" else 15158332  # 青 / 赤
