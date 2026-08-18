@@ -246,18 +246,23 @@ def build_embed(d, short_dir, short_reason, short_bull, short_bear,
                 "description": f"{ts}（日本時間）",
                 "color": color,
                 "fields": [
+                     {
+                        "name": "総合判定",
+                        "value": (
+                            f"短期：{short_dir}（ブル点 {short_bull} / ベア点 {short_bear}）\n"
+                            f"スイング：{swing_dir}（ブル点 {swing_bull} / ベア点 {swing_bear}）"
+                        )
+                    },
                     {
                         "name": "短期（1〜2日）",
                         "value": (
-                            f"方向性：{short_dir}（ブル点 {short_bull} / ベア点 {short_bear}）\n"
-                            f"理由：{', '.join(short_reason[:4])}"
+                           f"理由：{', '.join(short_reason[:4])}"
                         )
                     },
                     {
                         "name": "スイング（3〜5日）",
                         "value": (
-                            f"方向性：{swing_dir}（ブル点 {swing_bull} / ベア点 {swing_bear}）\n"
-                            f"理由：{', '.join(swing_reason[:4])}"
+                           f"理由：{', '.join(swing_reason[:4])}"
                         )
                     },
                     {
@@ -271,21 +276,17 @@ def build_embed(d, short_dir, short_reason, short_bull, short_bear,
                             f"EWJ：{d['ewj']['close']:.2f}（{color_pct(d['ewj']['pct_change'])}）"
                         )
                     },
-                    {
-                        "name": "セクター（前日比付き）",
-                        "value": (
+                   {
+                    　 "name": "セクター（前日比付き）",
+                    　 "value": (
                             f"金融：{d['bank']['close']:.2f}（{color_pct(d['bank']['pct_change'])}）\n"
                             f"通信：{d['telecom']['close']:.2f}（{color_pct(d['telecom']['pct_change'])}）\n"
-                            f"電気：{d['electric']['close']:.2f}（{color_pct(d['electric']['pct_change'])}）"
+                            f"電気：{d['electric']['close']:.2f}（{color_pct(d['electric']['pct_change'])}）\n"
+                            f"自動車：{d['auto']['close']:.2f}（{color_pct(d['auto']['pct_change'])}）\n"
+                            f"商社：{d['trading']['close']:.2f}（{color_pct(d['trading']['pct_change'])}）\n"
+                            f"機械：{d['machine']['close']:.2f}（{color_pct(d['machine']['pct_change'])}）"
                         )
-                    },
-                    {
-                        "name": "総合判定",
-                        "value": (
-                            f"短期：{short_dir}（ブル点 {short_bull} / ベア点 {short_bear}）\n"
-                            f"スイング：{swing_dir}（ブル点 {swing_bull} / ベア点 {swing_bear}）"
-                        )
-                    }
+                 },
                 ]
             }
         ]
