@@ -1,3 +1,5 @@
+from datetime import datetime
+import pytz
 import yfinance as yf
 import requests
 import os
@@ -37,8 +39,10 @@ def fetch_data():
         ma15 = df["Close"].rolling(15).mean().iloc[-1]
         ma25 = df["Close"].rolling(25).mean().iloc[-1]
 
-        # 最終更新日時（日本時間）
-        last_ts = df.index[-1].tz_convert("Asia/Tokyo")
+
+        # 実行時刻（日本時間）
+        jst = pytz.timezone("Asia/Tokyo")
+        ts = datetime.now(jst).strftime("%Y-%m-%d %H:%M")
 
         data[name] = {
             "close": close,
