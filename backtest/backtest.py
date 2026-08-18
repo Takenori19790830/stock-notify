@@ -1,73 +1,73 @@
-import os
-import csv
-from datetime import datetime
-import requests
+import yfinance as yf
+import pandas as pd
+from datetime import datetime, timedelta
 
-# 価格取得（notify.py と同じ）
-def get_price(symbol):
-    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
-    try:
-        data = requests.get(url).json()
-        return data["chart"]["result"][0]["meta"]["regularMarketPrice"]
-    except Exception:
-        return None
+# ============================
+# 取得対象
+# ============================
 
-# CSV の保存先
-CSV_PATH = "data/results.csv"
+TICKERS = {
+    "nikkei": "1321.T",
+    "topix": "1306.T",
+    "usd_jpy": "JPY=X",
+    "spy": "SPY",
+    "vix": "^VIX",
+    "bank": "1615.T",
+    "telecom": "1620.T",
+    "electric": "1625.T",
+    "auto": "1622.T",
+    "trading": "1629.T",
+    "machine": "1624.T",
+    "ewj": "EWJ"
+}
 
-# 今日の判定（notify.py が出した MODE を読む）
-def read_signal():
-    # GitHub Actions の環境変数 MODE を読む
-    return os.getenv("MODE_SIGNAL", "neutral")
+# ============================
+# 3年分のデータ取得
+# ============================
 
-# 仮想売買モデル（最小構成）
-def simple_model(signal):
-    """
-    signal: bull / bear / neutral
-    戻り値: (entry_price, exit_price, pnl)
-    """
+def fetch_3years():
+    end = datetime.today()
+    start = end - timedelta(days=365*3)
 
-    # 日経平均を使う（指数連動ブルベアの代替）
-    price = get_price("^N225")
-    if price is None:
-        return (None, None, None)
+    frames = []
 
-    # entry（仮想）
-    entry = price
+    for name, ticker in TICKERS.items():
+        df = yf.Ticker(ticker).history(start=start, end=end)
 
-    # exit（仮想）→ 1%動いたと仮定（最小構成）
-    if signal == "bull":
-        exit = entry * 1.01
-    elif signal == "bear":
-        exit = entry * 0.99
-    else:
-        exit = entry
+        df = df[["Close"]].rename(columns={"Close": f"{name}_close"})
+        df[f"{name}_pct"] = df[f"{name}_close"].pct_change() * 100
+        df[f"{name}_ma5"] = df[f"{name}_close"].rolling(5).mean()
+        df[f"{name}_ma15"] = df[f"{name}_close"].rolling(15).mean()
+        df[f"{name}_ma25"] = df[f"{name}_close"].rolling(25).mean()
+        df[f"{name}_kairi5"] = (df[f"{name}_close"] - df[f"{name}_ma5"]) / df[f"{name}_ma5"] * 100
+        df[f"{name}_kairi15"] = (df[f"{name}_close"] - df[f"{name}_ma15"]) / df[f"{name}_ma15"] * 100
 
-    pnl = exit - entry
-    return (entry, exit, pnl)
+        frames.append(df)
 
-# CSV に追記
-def append_csv(date, model, signal, entry, exit, pnl):
-    header = ["date", "model", "signal", "entry_price", "exit_price", "pnl"]
+    # ============================
+    # 日付で結合
+    # ============================
 
-    # ファイルがなければヘッダーを書く
-    try:
-        with open(CSV_PATH, "x", newline="") as f:
-            writer = csv.writer(f)
-            writer.writerow(header)
-    except FileExistsError:
-        pass
+    base = frames[0]
+    for f in frames[1:]:
+        base = base.join(f, how="outer")
 
-    # 追記
-    with open(CSV_PATH, "a", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerow([date, model, signal, entry, exit, pnl])
+    base = base.dropna()
 
-# メイン処理
+    return base
+
+# ============================
+# CSV 出力
+# ============================
+
+def save_csv(df):
+    df.to_csv("backtest/data/3years.csv", index=True)
+    print("CSV 出力完了：backtest/data/3years.csv")
+
+# ============================
+# 実行
+# ============================
+
 if __name__ == "__main__":
-    today = datetime.now().strftime("%Y-%m-%d")
-
-    signal = read_signal()  # notify.py が出した判定
-    entry, exit, pnl = simple_model(signal)
-
-    append_csv(today, "model1", signal, entry, exit, pnl)
+    df = fetch_3years()
+    save_csv(df)
